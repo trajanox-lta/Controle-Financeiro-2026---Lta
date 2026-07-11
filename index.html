@@ -487,21 +487,19 @@ const sheetURL = (id, aba) =>
 
 // Corrige o caso comum em que o Google Sheets entrega texto com acentuação
 // "embaralhada" (ex.: "MÃªs" em vez de "Mês") por causa de uma dupla
-// codificação UTF-8 introduzida na conversão do arquivo. Reversível: relê os
-// caracteres como bytes Latin-1 e decodifica como UTF-8.
+// codificação UTF-8 introduzida na conversão do arquivo. Corrige por TRECHOS
+// (runs de caracteres na faixa Latin-1 0x80-0xFF) em vez de tudo-ou-nada,
+// então um caractere especial legítimo em qualquer lugar do arquivo (ex.: um
+// "–" numa Observação) não impede a correção do resto do documento.
 function fixMojibake(s){
-  if (!/Ã[\x80-\xBF\u0080-\u00BF]/.test(s)) return s; // sem o padrão, não mexe
-  try {
-    const bytes = new Uint8Array(s.length);
-    for (let i = 0; i < s.length; i++){
-      const code = s.charCodeAt(i);
-      if (code > 255) return s; // não é um candidato válido, mantém original
-      bytes[i] = code;
+  return s.replace(/[\u0080-\u00FF]+/g, run => {
+    try {
+      const bytes = Uint8Array.from([...run].map(c => c.charCodeAt(0)));
+      return new TextDecoder('utf-8', { fatal: true }).decode(bytes);
+    } catch(e){
+      return run; // trecho não é UTF-8 válido reinterpretado, mantém como está
     }
-    return new TextDecoder('utf-8', { fatal: true }).decode(bytes);
-  } catch(e){
-    return s; // não deu pra corrigir com segurança, mantém original
-  }
+  });
 }
 
 async function fetchSheet(id, aba){
