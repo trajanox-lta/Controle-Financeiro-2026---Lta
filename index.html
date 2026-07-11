@@ -553,6 +553,7 @@ async function loadAll(){
     BASE = normalizeBase(toObjects(rawBase, ['Categoria Principal','Tipo de transação','Valor','Conta']));
     ORC  = normalizeOrc(toObjects(rawOrc,  ['Categoria','Mês','Planejado']));
     if (!BASE.length) throw new Error('A aba de fluxo de caixa veio sem transações.');
+    buildIndexes();
     afterLoad();
     setStatus(`Dados atualizados · ${BASE.length} transações lidas.`,'ok');
     setTimeout(clearStatus, 4000);
@@ -585,18 +586,38 @@ const mesNome = () => MESES[mesSel()-1];
 
 const isCredito = t => t.meio === 'credito';
 
+// Índices construídos uma vez após cada carregamento (não a cada cálculo).
+// Isso mantém o dashboard rápido mesmo com muitos anos de lançamentos
+// acumulados: cada consulta olha só o pedaço relevante (o ano, ou a conta),
+// não a base inteira.
+let BY_YEAR = new Map();   // ano -> transações daquele ano (Data Lançamento)
+let BY_CONTA = new Map();  // conta normalizada -> transações daquela conta
+
+function buildIndexes(){
+  BY_YEAR = new Map();
+  BY_CONTA = new Map();
+  for (const t of BASE){
+    if (!BY_YEAR.has(t.ano)) BY_YEAR.set(t.ano, []);
+    BY_YEAR.get(t.ano).push(t);
+    const c = norm(t.conta);
+    if (!BY_CONTA.has(c)) BY_CONTA.set(c, []);
+    BY_CONTA.get(c).push(t);
+  }
+}
+
 function somaFluxo(tipo, mes, ano){
-  return BASE.filter(t => t.tipo === tipo && !isCredito(t) && t.mesRef === mes && t.ano === ano)
-             .reduce((s,t) => s + t.valor, 0);
+  const arr = BY_YEAR.get(ano) || [];
+  return arr.filter(t => t.tipo === tipo && !isCredito(t) && t.mesRef === mes)
+            .reduce((s,t) => s + t.valor, 0);
 }
 function saldoConta(conta){
-  return BASE.filter(t => norm(t.conta) === norm(conta) && !isCredito(t))
-             .reduce((s,t) => s + t.valor, 0);
+  const arr = BY_CONTA.get(norm(conta)) || [];
+  return arr.filter(t => !isCredito(t)).reduce((s,t) => s + t.valor, 0);
 }
 function gastoCartao(cartao, mes, ano){
-  return -BASE.filter(t => norm(t.conta) === norm(cartao) && isCredito(t) &&
-                           t.mesFat === mes && t.anoFat === ano)
-              .reduce((s,t) => s + t.valor, 0);
+  const arr = BY_CONTA.get(norm(cartao)) || [];
+  return -arr.filter(t => isCredito(t) && t.mesFat === mes && t.anoFat === ano)
+             .reduce((s,t) => s + t.valor, 0);
 }
 function planejado(cat, mes, ano){
   return ORC.filter(r => norm(r.categoria) === norm(cat) && norm(r.mes) === norm(mes) &&
@@ -604,9 +625,9 @@ function planejado(cat, mes, ano){
             .reduce((s,r) => s + r.planejado, 0);
 }
 function realizado(cat, mes, ano){
-  return -BASE.filter(t => norm(t.catP) === norm(cat) && t.tipo === 'saida' &&
-                           t.mesRef === mes && t.ano === ano)
-              .reduce((s,t) => s + t.valor, 0);
+  const arr = BY_YEAR.get(ano) || [];
+  return -arr.filter(t => norm(t.catP) === norm(cat) && t.tipo === 'saida' && t.mesRef === mes)
+             .reduce((s,t) => s + t.valor, 0);
 }
 function statusDe(p, r){
   if (p === 0 && r > 0) return ['Ajustar urgente','st-bad'];
@@ -618,7 +639,7 @@ function statusDe(p, r){
 function categoriasDoAno(ano){
   const set = new Set();
   ORC.filter(r => !r.ano || r.ano === ano).forEach(r => set.add(r.categoria));
-  BASE.filter(t => t.ano === ano && t.tipo === 'saida').forEach(t => { if (t.catP) set.add(t.catP); });
+  (BY_YEAR.get(ano) || []).filter(t => t.tipo === 'saida').forEach(t => { if (t.catP) set.add(t.catP); });
   // Categorias que não são despesa orçada
   ['Saldo','Renda','Receitas variáveis','Cartão de crédito','Contas a pagar'].forEach(x => set.delete(x));
   return [...set].sort((a,b) => a.localeCompare(b,'pt-BR'));
@@ -864,6 +885,7 @@ function demo(){
   ORC = [];
   MESES.forEach(m => Object.entries(P).forEach(([c,v]) =>
     ORC.push({categoria:c, mes:m, ano:2026, planejado: m === 'Julho' ? v : v*1.4})));
+  buildIndexes();
   afterLoad();
   setStatus('Exibindo dados de exemplo. Conecte sua planilha para ver os números reais.','info');
 }
