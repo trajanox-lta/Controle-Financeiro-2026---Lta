@@ -158,7 +158,28 @@ var o=[];var l=Array.isArray(e);for(f=n.s.c;f<=n.e.c;++f)s[f]=ya(f);for(var c=n.
   summary{cursor:pointer;font-size:13px;color:var(--navy);font-weight:600}
   details ol{font-size:13px;color:var(--ink-2);line-height:1.8;padding-left:20px}
 
+  /* ---- modal de lançamento ---- */
+  .overlay{position:fixed;inset:0;background:rgba(20,28,50,.55);display:none;
+           align-items:flex-start;justify-content:center;padding:32px 16px;z-index:50;overflow-y:auto}
+  .overlay.show{display:flex}
+  .modal{background:#fff;border-radius:var(--radius);max-width:640px;width:100%;
+         box-shadow:0 20px 60px rgba(0,0,0,.3)}
+  .modal header{background:var(--navy);color:#fff;padding:14px 20px;border-radius:var(--radius) var(--radius) 0 0;
+                display:flex;justify-content:space-between;align-items:center}
+  .modal header h2{margin:0;font-size:16px;font-weight:600}
+  .modal header button{background:transparent;border:none;color:#fff;font-size:22px;line-height:1;padding:0 4px;cursor:pointer}
+  .modal .body{padding:20px}
+  .form-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+  .form-grid .full{grid-column:1/-1}
+  .form-grid label{display:flex;flex-direction:column;gap:4px;font-size:12px;color:var(--ink-2);font-weight:600}
+  .form-grid input,.form-grid select{font-size:14px;padding:8px 10px;border:1px solid var(--line);border-radius:6px;width:100%}
+  .modal footer{padding:14px 20px;border-top:1px solid var(--line);display:flex;justify-content:flex-end;gap:10px}
+  .fld-hint{font-weight:400;color:#9aa2b3;font-size:11px}
+  .hidden-field{display:none !important}
+  #dfRow.hidden-field{display:none !important}
+
   @media (max-width:640px){
+    .form-grid{grid-template-columns:1fr}
     .charts{grid-template-columns:1fr}
     .chartbox{height:260px}
     h1{font-size:20px}
@@ -185,6 +206,7 @@ var o=[];var l=Array.isArray(e);for(f=n.s.c;f<=n.e.c;++f)s[f]=ya(f);for(var c=n.
       <label class="fld">Mês
         <select id="selMes"></select>
       </label>
+      <button id="btnNovo" class="hidden">+ Novo lançamento</button>
       <button id="btnReload" class="ghost">Atualizar dados</button>
       <button id="btnExport" disabled>Exportar para Excel</button>
     </div>
@@ -217,6 +239,12 @@ var o=[];var l=Array.isArray(e);for(f=n.s.c;f<=n.e.c;++f)s[f]=ya(f);for(var c=n.
       </label>
       <label class="fld">Limite Picpay
         <input type="number" id="cfgLimPicpay" value="3000">
+      </label>
+      <label class="fld" style="grid-column:1/-1">URL do conector de escrita (opcional — para lançar pelo site)
+        <input type="text" id="cfgScriptUrl" placeholder="https://script.google.com/macros/s/…/exec">
+      </label>
+      <label class="fld">Código de acesso do conector
+        <input type="text" id="cfgScriptKey" placeholder="o mesmo definido no script">
       </label>
     </div>
     <button id="btnConnect">Carregar dashboard</button>
@@ -288,6 +316,58 @@ var o=[];var l=Array.isArray(e);for(f=n.s.c;f<=n.e.c;++f)s[f]=ya(f);for(var c=n.
 
     <p class="meta" id="footMeta"></p>
   </main>
+
+
+<div class="overlay" id="overlay">
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="mdlTitle">
+    <header>
+      <h2 id="mdlTitle">Novo lançamento</h2>
+      <button id="mdlClose" aria-label="Fechar">&times;</button>
+    </header>
+    <div class="body">
+      <div id="mdlStatus" class="status"></div>
+      <div class="form-grid">
+        <label>Tipo
+          <select id="fTipo"><option>Saída</option><option>Entrada</option><option>Neutro</option></select>
+        </label>
+        <label>Data do lançamento
+          <input type="date" id="fData">
+        </label>
+        <label>Categoria
+          <select id="fCat"></select>
+        </label>
+        <label>Subcategoria
+          <select id="fSub"></select>
+        </label>
+        <label>Valor (R$) <span class="fld-hint">só o número, positivo</span>
+          <input type="text" inputmode="decimal" id="fValor" placeholder="0,00">
+        </label>
+        <label>Meio de pagamento
+          <select id="fMeio"><option>Débito</option><option>Crédito</option><option>Transferência</option></select>
+        </label>
+        <label>Conta
+          <select id="fConta"><option>Itaú</option><option>Nubank</option><option>Picpay</option><option>Binance</option><option>Cofrinho</option></select>
+        </label>
+        <label id="dfRow" class="hidden-field">Data da fatura <span class="fld-hint">só para crédito</span>
+          <input type="date" id="fDataFatura">
+        </label>
+        <label>Natureza
+          <select id="fNatureza"><option>Despesa</option><option>Receita</option><option>Compartilhado</option><option>Investimento</option><option>Neutro</option></select>
+        </label>
+        <label>Pagador
+          <select id="fPagador"><option>EU</option><option>Conjunto</option><option>Mãe</option><option>Tais</option><option>Arthur</option><option>Talita</option><option>Elaine</option><option>Receita</option></select>
+        </label>
+        <label class="full">Observação <span class="fld-hint">opcional</span>
+          <input type="text" id="fObs" placeholder="ex.: compra parcelada 2/6">
+        </label>
+      </div>
+    </div>
+    <footer>
+      <button class="ghost" id="mdlCancel">Cancelar</button>
+      <button id="mdlSave">Salvar lançamento</button>
+    </footer>
+  </div>
+</div>
 
 </div>
 
@@ -395,6 +475,7 @@ const pick = (obj, name) => {
    Estado
    ============================================================ */
 let CFG   = {id:'', abaFluxo:'Fluxo de caixa', abaOrc:'Orçamento Consolidado',
+             scriptUrl:'', scriptKey:'',
              limites:{'Itaú':5000,'Nubank':3200,'Picpay':3000}};
 let BASE  = [];   // transações normalizadas
 let ORC   = [];   // orçamento normalizado
@@ -404,11 +485,31 @@ let chCat = null, chFluxo = null;
 const sheetURL = (id, aba) =>
   `https://docs.google.com/spreadsheets/d/${id}/gviz/tq?tqx=out:csv&sheet=${encodeURIComponent(aba)}`;
 
+// Corrige o caso comum em que o Google Sheets entrega texto com acentuação
+// "embaralhada" (ex.: "MÃªs" em vez de "Mês") por causa de uma dupla
+// codificação UTF-8 introduzida na conversão do arquivo. Reversível: relê os
+// caracteres como bytes Latin-1 e decodifica como UTF-8.
+function fixMojibake(s){
+  if (!/Ã[\x80-\xBF\u0080-\u00BF]/.test(s)) return s; // sem o padrão, não mexe
+  try {
+    const bytes = new Uint8Array(s.length);
+    for (let i = 0; i < s.length; i++){
+      const code = s.charCodeAt(i);
+      if (code > 255) return s; // não é um candidato válido, mantém original
+      bytes[i] = code;
+    }
+    return new TextDecoder('utf-8', { fatal: true }).decode(bytes);
+  } catch(e){
+    return s; // não deu pra corrigir com segurança, mantém original
+  }
+}
+
 async function fetchSheet(id, aba){
   const res = await fetch(sheetURL(id, aba));
   if (!res.ok) throw new Error(`Não consegui ler a aba "${aba}" (HTTP ${res.status}). Confira o nome da aba e o compartilhamento da planilha.`);
-  const txt = await res.text();
+  let txt = await res.text();
   if (txt.trim().startsWith('<')) throw new Error('A planilha respondeu com uma página de login. Compartilhe como "Qualquer pessoa com o link — Leitor".');
+  txt = fixMojibake(txt);
   return parseCSV(txt);
 }
 
@@ -468,6 +569,7 @@ function afterLoad(){
   document.getElementById('setup').classList.add('hidden');
   document.getElementById('dash').classList.remove('hidden');
   document.getElementById('btnExport').disabled = false;
+  document.getElementById('btnNovo').classList.toggle('hidden', !CFG.scriptUrl);
   buildAnos();
   render();
   const now = new Date();
@@ -708,6 +810,8 @@ function cfgFromForm(){
     id:       document.getElementById('cfgId').value.trim(),
     abaFluxo: document.getElementById('cfgAbaFluxo').value.trim(),
     abaOrc:   document.getElementById('cfgAbaOrc').value.trim(),
+    scriptUrl: document.getElementById('cfgScriptUrl').value.trim(),
+    scriptKey: document.getElementById('cfgScriptKey').value.trim(),
     limites:{
       'Itaú':   parseNum(document.getElementById('cfgLimItau').value),
       'Nubank': parseNum(document.getElementById('cfgLimNubank').value),
@@ -719,6 +823,8 @@ function formFromCfg(c){
   document.getElementById('cfgId').value       = c.id || '';
   document.getElementById('cfgAbaFluxo').value = c.abaFluxo || 'Fluxo de caixa';
   document.getElementById('cfgAbaOrc').value   = c.abaOrc || 'Orçamento Consolidado';
+  document.getElementById('cfgScriptUrl').value = c.scriptUrl || '';
+  document.getElementById('cfgScriptKey').value = c.scriptKey || '';
   document.getElementById('cfgLimItau').value   = c.limites?.['Itaú']   ?? 5000;
   document.getElementById('cfgLimNubank').value = c.limites?.['Nubank'] ?? 3200;
   document.getElementById('cfgLimPicpay').value = c.limites?.['Picpay'] ?? 3000;
@@ -764,6 +870,92 @@ function demo(){
   setStatus('Exibindo dados de exemplo. Conecte sua planilha para ver os números reais.','info');
 }
 
+
+/* ============================================================
+   Lançamento de despesas (grava via Google Apps Script)
+   ============================================================ */
+const CAT_PAIRS = {"Alimentação": ["Bebidas", "Comidas rápidas", "Mercados", "Outros gastos com alimento", "Restaurante"], "Consumo recreativo": ["Tabacos e kits", "Weed"], "Contas a pagar": ["Empréstimos para terceiros", "Empréstimos pessoais", "Juros e encargos (LIS)", "Multas", "Pagamento de fatura cartão", "Pagamento para terceiros"], "Cuidados pessoais": ["Cabelo", "Produtos de higiene pessoal", "Roupas e calçados"], "Entretenimento": ["Cinema", "Raves / Shows", "Rolês aleatórios"], "Estudos": ["Cursos", "Livros"], "Moradia": ["Hipoteca ou aluguel", "Luz", "Manutenção e reparos", "Outras despesas de casa", "Utensilios domésticos e acessórios", "Água"], "Plano de assinaturas": ["Assinatura Streamer", "Myprofit", "Plano Icloud", "Plano TIM", "Plataformas diversas"], "Presentes e doações": ["Presentes para terceiros"], "Receitas variáveis": ["Estornos", "Ganhos de terceiros", "Receitas de moradia", "Renda extra", "Rendimentos em investimentos", "Restituição IR"], "Renda": ["Férias", "Salário"], "Saldo": ["Ajuste", "Transferência entre contas", "Valor inicial"], "Saúde e vigor": ["Academia", "Remédios", "Suplementação"], "Transporte": ["Combustível", "Estacionamento", "Manutenção", "Outras despesas", "Transporte público", "Uber/Taxi"], "Viagem": ["Hotel / acomodação", "Malas e acessórios"]};
+
+function preencherCategorias(){
+  const selCat = document.getElementById('fCat');
+  const cats = Object.keys(CAT_PAIRS).sort((a,b)=>a.localeCompare(b,'pt-BR'));
+  selCat.innerHTML = cats.map(c=>`<option>${c}</option>`).join('');
+  preencherSubcategorias();
+}
+function preencherSubcategorias(){
+  const cat = document.getElementById('fCat').value;
+  const subs = CAT_PAIRS[cat] || [];
+  document.getElementById('fSub').innerHTML = subs.map(s=>`<option>${s}</option>`).join('') || '<option value="">—</option>';
+}
+function toggleDataFatura(){
+  const meio = norm(document.getElementById('fMeio').value);
+  const row = document.getElementById('dfRow');
+  if (meio === 'credito') row.classList.remove('hidden-field');
+  else row.classList.add('hidden-field');
+}
+function abrirModal(){
+  document.getElementById('mdlStatus').className = 'status';
+  document.getElementById('fData').value = new Date().toISOString().slice(0,10);
+  document.getElementById('fValor').value = '';
+  document.getElementById('fObs').value = '';
+  preencherCategorias();
+  toggleDataFatura();
+  document.getElementById('overlay').classList.add('show');
+}
+function fecharModal(){ document.getElementById('overlay').classList.remove('show'); }
+
+function setModalStatus(msg, kind){
+  const el = document.getElementById('mdlStatus');
+  el.className = 'status show ' + (kind||'info');
+  el.textContent = msg;
+}
+
+async function salvarLancamento(){
+  if (!CFG.scriptUrl){
+    setModalStatus('Para lançar pelo site, configure a URL do conector de escrita na tela inicial.', 'err');
+    return;
+  }
+  const valor = parseNum(document.getElementById('fValor').value);
+  if (!valor){ setModalStatus('Informe um valor maior que zero.', 'err'); return; }
+
+  const payload = {
+    chave: CFG.scriptKey,
+    dataLancamento: document.getElementById('fData').value,
+    dataFatura: norm(document.getElementById('fMeio').value)==='credito'
+                ? document.getElementById('fDataFatura').value : '',
+    categoriaPrincipal: document.getElementById('fCat').value,
+    categoriaSecundaria: document.getElementById('fSub').value,
+    tipo: document.getElementById('fTipo').value,
+    valor: valor,
+    meio: document.getElementById('fMeio').value,
+    conta: document.getElementById('fConta').value,
+    natureza: document.getElementById('fNatureza').value,
+    pagador: document.getElementById('fPagador').value,
+    observacao: document.getElementById('fObs').value
+  };
+
+  const btn = document.getElementById('mdlSave');
+  btn.disabled = true;
+  setModalStatus('Salvando na planilha…', 'info');
+  try{
+    // text/plain evita o preflight CORS que o Apps Script não responde
+    const res = await fetch(CFG.scriptUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+      body: JSON.stringify(payload)
+    });
+    const data = await res.json();
+    if (!data.ok) throw new Error(data.erro || 'Falha ao salvar.');
+    setModalStatus('Lançamento salvo! Atualizando o dashboard…', 'ok');
+    await loadAll();
+    setTimeout(fecharModal, 700);
+  }catch(e){
+    setModalStatus('Não consegui salvar: ' + e.message, 'err');
+  }finally{
+    btn.disabled = false;
+  }
+}
+
 /* ============================================================
    Boot
    ============================================================ */
@@ -777,6 +969,16 @@ function demo(){
   document.getElementById('btnReload').addEventListener('click', () => CFG.id ? loadAll() : demo());
   document.getElementById('btnExport').addEventListener('click', exportXLSX);
   document.getElementById('btnDemo').addEventListener('click', demo);
+
+  document.getElementById('btnNovo').addEventListener('click', abrirModal);
+  document.getElementById('mdlClose').addEventListener('click', fecharModal);
+  document.getElementById('mdlCancel').addEventListener('click', fecharModal);
+  document.getElementById('mdlSave').addEventListener('click', salvarLancamento);
+  document.getElementById('fCat').addEventListener('change', preencherSubcategorias);
+  document.getElementById('fMeio').addEventListener('change', toggleDataFatura);
+  document.getElementById('overlay').addEventListener('click', (e) => {
+    if (e.target.id === 'overlay') fecharModal();
+  });
 
   document.getElementById('btnConnect').addEventListener('click', () => {
     const c = cfgFromForm();
