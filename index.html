@@ -96,6 +96,11 @@ var o=[];var l=Array.isArray(e);for(f=n.s.c;f<=n.e.c;++f)s[f]=ya(f);for(var c=n.
   .c-navy{background:var(--navy)}
   .c-blue{background:var(--blue)}
   .c-purple{background:var(--purple)}
+  .c-teal{background:#148F77}
+  .c-orange{background:#C0663A}
+  .c-gold{background:#B8860B}
+  .viewlabel{font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:.04em;
+             color:#3A3F58;background:#eef0f5;border-radius:6px;padding:7px 12px;margin:0 0 10px}
 
   .panel{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);overflow:hidden;margin-bottom:18px}
   .panel > h2{
@@ -269,11 +274,20 @@ var o=[];var l=Array.isArray(e);for(f=n.s.c;f<=n.e.c;++f)s[f]=ya(f);for(var c=n.
 
   <main id="dash" class="hidden">
 
+    <p class="viewlabel">Visão de caixa — movimento real nas contas (por tipo de transação; exclui crédito)</p>
     <div class="grid kpis">
       <div class="card c-green"><div class="lbl">Entradas</div><div class="val" id="kEntradas">—</div></div>
       <div class="card c-red"><div class="lbl">Saídas</div><div class="val" id="kSaidas">—</div></div>
       <div class="card c-navy"><div class="lbl">Saldo do mês</div><div class="val" id="kSaldo">—</div></div>
       <div class="card c-navy"><div class="lbl">% Saldo do mês</div><div class="val" id="kPct">—</div></div>
+    </div>
+
+    <p class="viewlabel">Visão pessoal — por natureza (ignora meio de pagamento; exclui neutro e compartilhado)</p>
+    <div class="grid kpis">
+      <div class="card c-teal"><div class="lbl">Receita (pessoal)</div><div class="val" id="kReceita">—</div></div>
+      <div class="card c-orange"><div class="lbl">Despesa (pessoal)</div><div class="val" id="kDespesa">—</div></div>
+      <div class="card c-gold"><div class="lbl">Investimento</div><div class="val" id="kInvest">—</div></div>
+      <div class="card c-navy"><div class="lbl">Saldo pessoal</div><div class="val" id="kSaldoPessoal">—</div></div>
     </div>
 
     <section class="panel">
@@ -451,16 +465,30 @@ function parseDate(v){
   return isNaN(d) ? null : d;
 }
 
-// Localiza a linha de cabeçalho (a planilha tem linhas de título acima dela)
-function toObjects(rows, mustHave){
-  const want = mustHave.map(norm);
-  let hi = -1;
+// Localiza a linha de cabeçalho (a planilha tem linhas de título acima dela) e monta
+// os objetos de cada linha. Em vez de exigir que TODAS as colunas canônicas tenham
+// texto (algumas planilhas ficam com célula de cabeçalho em branco em certas colunas,
+// mesmo com os dados corretos abaixo), escolhe a linha com MAIS colunas batendo com o
+// esperado, e preenche qualquer célula de cabeçalho em branco usando o nome canônico
+// daquela posição — a ordem das colunas é sempre a mesma, só a etiqueta pode faltar.
+function toObjects(rows, canonHeaders, minMatches){
+  const canonNorm = canonHeaders.map(norm);
+  minMatches = minMatches || Math.min(3, canonHeaders.length);
+  let hi = -1, bestScore = -1;
   for (let i = 0; i < Math.min(rows.length, 30); i++){
     const cells = rows[i].map(norm);
-    if (want.every(w => cells.includes(w))){ hi = i; break; }
+    let score = 0;
+    canonNorm.forEach(w => { if (cells.includes(w)) score++; });
+    if (score > bestScore){ bestScore = score; hi = i; }
   }
-  if (hi === -1) throw new Error('Cabeçalho não encontrado. Esperava as colunas: ' + mustHave.join(', '));
-  const head = rows[hi].map(h => String(h).trim());
+  if (hi === -1 || bestScore < minMatches){
+    throw new Error('Cabeçalho não encontrado. Esperava colunas como: ' + canonHeaders.slice(0,4).join(', '));
+  }
+  const rawHead = rows[hi];
+  const head = canonHeaders.map((name, idx) => {
+    const cellText = String(rawHead[idx] ?? '').trim();
+    return cellText || name; // célula em branco -> usa o nome canônico pela posição
+  });
   return rows.slice(hi+1)
     .filter(r => r.some(c => String(c).trim() !== ''))
     .map(r => { const o = {}; head.forEach((h,i) => { if (h) o[h] = r[i]; }); return o; });
@@ -470,6 +498,14 @@ const pick = (obj, name) => {
   const k = Object.keys(obj).find(k => norm(k) === norm(name));
   return k ? obj[k] : undefined;
 };
+
+// Ordem canônica das colunas — usada tanto para achar o cabeçalho quanto para
+// preencher etiquetas que estejam em branco na planilha.
+const CANON_FLUXO = ['Data Lançamento','Data Fatura','Mês','Mês ref','Ano','Categoria Principal',
+                      'Categoria Secundária','Tipo de transação','Valor','Meio de pagamento','Conta',
+                      'Natureza','Pagador','Parcela','Observação'];
+const CANON_ORC = ['Categoria','Subcategoria','Mês','Ano','Planejado','Realizado',
+                    'Diferença','Progresso %','Status'];
 
 /* ============================================================
    Estado
@@ -486,20 +522,43 @@ const sheetURL = (id, aba) =>
   `https://docs.google.com/spreadsheets/d/${id}/gviz/tq?tqx=out:csv&sheet=${encodeURIComponent(aba)}`;
 
 // Corrige o caso comum em que o Google Sheets entrega texto com acentuação
-// "embaralhada" (ex.: "MÃªs" em vez de "Mês") por causa de uma dupla
-// codificação UTF-8 introduzida na conversão do arquivo. Corrige por TRECHOS
-// (runs de caracteres na faixa Latin-1 0x80-0xFF) em vez de tudo-ou-nada,
-// então um caractere especial legítimo em qualquer lugar do arquivo (ex.: um
-// "–" numa Observação) não impede a correção do resto do documento.
+// "embaralhada" por causa de uma dupla codificação UTF-8 introduzida na
+// conversão do arquivo (ex.: "MÃªs" em vez de "Mês", ou "NÃƒO" em vez de "NÃO"
+// quando a variante usada foi Windows-1252 em vez de Latin-1 pura).
+// Corrige por TRECHOS: um caractere especial legítimo em qualquer lugar do
+// arquivo não impede a correção do resto do documento — se o trecho não for
+// UTF-8 válido ao reinterpretar, ele é mantido exatamente como estava.
+const CP1252_ESPECIAIS = { // faixa 0x80-0x9F do Windows-1252 que difere do Latin-1 puro
+  0x20AC:0x80, 0x201A:0x82, 0x0192:0x83, 0x201E:0x84, 0x2026:0x85, 0x2020:0x86,
+  0x2021:0x87, 0x02C6:0x88, 0x2030:0x89, 0x0160:0x8A, 0x2039:0x8B, 0x0152:0x8C,
+  0x017D:0x8E, 0x2018:0x91, 0x2019:0x92, 0x201C:0x93, 0x201D:0x94, 0x2022:0x95,
+  0x2013:0x96, 0x2014:0x97, 0x02DC:0x98, 0x2122:0x99, 0x0161:0x9A, 0x203A:0x9B,
+  0x0153:0x9C, 0x017E:0x9E, 0x0178:0x9F
+};
+function cp1252Byte(ch){
+  const code = ch.codePointAt(0);
+  if (code < 0x80) return code;
+  if (code <= 0xFF) return CP1252_ESPECIAIS[code] ?? code; // sem mapeamento específico -> assume identidade
+  return CP1252_ESPECIAIS[code] ?? null; // aspas curvas, travessão etc. fora da faixa 0-255
+}
 function fixMojibake(s){
-  return s.replace(/[\u0080-\u00FF]+/g, run => {
+  let out = '', run = [], runText = '';
+  const flush = () => {
+    if (!run.length) return;
     try {
-      const bytes = Uint8Array.from([...run].map(c => c.charCodeAt(0)));
-      return new TextDecoder('utf-8', { fatal: true }).decode(bytes);
+      out += new TextDecoder('utf-8', { fatal: true }).decode(Uint8Array.from(run));
     } catch(e){
-      return run; // trecho não é UTF-8 válido reinterpretado, mantém como está
+      out += runText; // não é UTF-8 válido reinterpretado: mantém o texto original
     }
-  });
+    run = []; runText = '';
+  };
+  for (const ch of s){
+    const b = ch.codePointAt(0) >= 0x80 ? cp1252Byte(ch) : null;
+    if (b !== null){ run.push(b); runText += ch; }
+    else { flush(); out += ch; }
+  }
+  flush();
+  return out;
 }
 
 async function fetchSheet(id, aba){
@@ -550,8 +609,8 @@ async function loadAll(){
       fetchSheet(CFG.id, CFG.abaFluxo),
       fetchSheet(CFG.id, CFG.abaOrc)
     ]);
-    BASE = normalizeBase(toObjects(rawBase, ['Categoria Principal','Tipo de transação','Valor','Conta']));
-    ORC  = normalizeOrc(toObjects(rawOrc,  ['Categoria','Mês','Planejado']));
+    BASE = normalizeBase(toObjects(rawBase, CANON_FLUXO));
+    ORC  = normalizeOrc(toObjects(rawOrc,  CANON_ORC));
     if (!BASE.length) throw new Error('A aba de fluxo de caixa veio sem transações.');
     buildIndexes();
     afterLoad();
@@ -608,6 +667,14 @@ function buildIndexes(){
 function somaFluxo(tipo, mes, ano){
   const arr = BY_YEAR.get(ano) || [];
   return arr.filter(t => t.tipo === tipo && !isCredito(t) && t.mesRef === mes)
+            .reduce((s,t) => s + t.valor, 0);
+}
+// Visão pessoal: soma por Natureza, ignorando meio de pagamento. Uma compra no
+// crédito conta como Despesa; pagar a fatura é Neutro e não entra. Neutro e
+// Compartilhado ficam de fora (não são resultado pessoal efetivo).
+function somaNatureza(natureza, mes, ano){
+  const arr = BY_YEAR.get(ano) || [];
+  return arr.filter(t => t.natureza === norm(natureza) && t.mesRef === mes)
             .reduce((s,t) => s + t.valor, 0);
 }
 function saldoConta(conta){
@@ -667,6 +734,15 @@ function render(){
   document.getElementById('kSaidas').textContent   = fmtR(sai);
   document.getElementById('kSaldo').textContent    = fmtR(saldo);
   document.getElementById('kPct').textContent      = ent === 0 ? '—' : fmtPct(saldo/ent);
+
+  // Visão pessoal (por Natureza)
+  const receita = somaNatureza('receita', mes, ano);
+  const despesa = somaNatureza('despesa', mes, ano);
+  const invest  = somaNatureza('investimento', mes, ano);
+  document.getElementById('kReceita').textContent      = fmtR(receita);
+  document.getElementById('kDespesa').textContent      = fmtR(despesa);
+  document.getElementById('kInvest').textContent       = fmtR(invest);
+  document.getElementById('kSaldoPessoal').textContent = fmtR(receita + despesa);
 
   // contas
   let total = 0;
@@ -767,11 +843,17 @@ function exportXLSX(){
     ['Mês de referência', nomeMes], ['Ano', ano],
     ['Gerado em', new Date().toLocaleString('pt-BR')],
     [],
-    ['Indicador','Valor'],
+    ['Visão de caixa (por tipo de transação, exclui crédito)',''],
     ['Entradas', ent],
     ['Saídas', sai],
     ['Saldo do mês', saldo],
     ['% Saldo do mês', ent === 0 ? 0 : saldo/ent],
+    [],
+    ['Visão pessoal (por natureza, ignora meio de pagamento)',''],
+    ['Receita', somaNatureza('receita', mes, ano)],
+    ['Despesa', somaNatureza('despesa', mes, ano)],
+    ['Investimento', somaNatureza('investimento', mes, ano)],
+    ['Saldo pessoal', somaNatureza('receita', mes, ano) + somaNatureza('despesa', mes, ano)],
     [],
     ['Conta','Saldo'],
     ...CONTAS.map(c => [c.nome, saldoConta(c.nome)]),
