@@ -1139,6 +1139,7 @@ async function salvarLancamento(){
     document.getElementById('cfgMeta').textContent = 'Configuração carregada do link. Salve esta página nos favoritos para reabrir já conectada.';
     if (CFG.id) loadAll();
   }
+  if (location.hash) document.getElementById('btnObjetivos').href = 'objetivos.html' + location.hash;
 })();
 </script>
 </body>
