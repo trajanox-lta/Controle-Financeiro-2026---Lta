@@ -321,6 +321,19 @@ var o=[];var l=Array.isArray(e);for(f=n.s.c;f<=n.e.c;++f)s[f]=ya(f);for(var c=n.
       </div>
     </section>
 
+    <section class="panel">
+      <h2>Fluxo de caixa — lançamentos <span style="font-weight:400;text-transform:none;letter-spacing:0;opacity:.8">— do mês selecionado no topo</span></h2>
+      <div class="body">
+        <label class="fld" style="margin-bottom:12px;max-width:260px">Categoria principal
+          <select id="fCatFiltro"><option value="">Todas as categorias</option></select>
+        </label>
+        <table>
+          <thead><tr><th>Data</th><th>Categoria secundária</th><th>Meio</th><th>Conta</th><th>Pagador</th><th>Valor</th></tr></thead>
+          <tbody id="tbFluxoDetalhe"></tbody>
+        </table>
+      </div>
+    </section>
+
     <div class="grid charts">
       <section class="panel">
         <h2>Planejado × realizado</h2>
@@ -596,6 +609,7 @@ function normalizeBase(objs){
       meio:     norm(pick(o,'Meio de pagamento')),
       conta:    String(pick(o,'Conta') ?? '').trim(),
       natureza: norm(pick(o,'Natureza')),
+      pagador:  String(pick(o,'Pagador') ?? '').trim(),
     };
   }).filter(t => t.catP || t.valor);
 }
@@ -637,6 +651,7 @@ function afterLoad(){
   document.getElementById('btnExport').disabled = false;
   document.getElementById('btnNovo').classList.toggle('hidden', !CFG.scriptUrl);
   buildAnos();
+  popularFiltroCategorias();
   render();
   const now = new Date();
   document.getElementById('footMeta').textContent =
@@ -677,6 +692,27 @@ function somaFluxo(tipo, mes, ano){
   return arr.filter(t => t.tipo === tipo && !isCredito(t) && t.mesRef === mes)
             .reduce((s,t) => s + t.valor, 0);
 }
+// Lançamentos "crus" do mês selecionado, respeitando a mesma convenção de data
+// usada no resto do site: Data Fatura para crédito, Data Lançamento para o
+// restante (débito, Pix, transferência). Olha a base inteira (não BY_YEAR)
+// porque uma fatura de dezembro pode cair em janeiro do ano seguinte.
+function lancamentosDoMes(mes, ano){
+  return BASE.filter(t => isCredito(t)
+    ? (t.mesFat === mes && t.anoFat === ano)
+    : (t.mesRef === mes && t.ano === ano));
+}
+function todasCategoriasPrincipais(){
+  const set = new Set();
+  BASE.forEach(t => { if (t.catP) set.add(t.catP); });
+  return [...set].sort((a,b) => a.localeCompare(b,'pt-BR'));
+}
+function popularFiltroCategorias(){
+  const sel = document.getElementById('fCatFiltro');
+  const atual = sel.value;
+  sel.innerHTML = '<option value="">Todas as categorias</option>' +
+    todasCategoriasPrincipais().map(c => `<option value="${c}">${c}</option>`).join('');
+  sel.value = [...sel.options].some(o => o.value === atual) ? atual : '';
+}
 // Visão pessoal: soma por Natureza, ignorando meio de pagamento. Uma compra no
 // crédito conta como Despesa; pagar a fatura é Neutro e não entra. Neutro e
 // Compartilhado ficam de fora (não são resultado pessoal efetivo).
@@ -701,7 +737,8 @@ function planejado(cat, mes, ano){
 }
 function realizado(cat, mes, ano){
   const arr = BY_YEAR.get(ano) || [];
-  return -arr.filter(t => norm(t.catP) === norm(cat) && t.tipo === 'saida' && t.mesRef === mes)
+  return -arr.filter(t => norm(t.catP) === norm(cat) && t.tipo === 'saida' && t.mesRef === mes &&
+                          norm(t.pagador) === norm('EU'))
              .reduce((s,t) => s + t.valor, 0);
 }
 function statusDe(p, r){
@@ -795,6 +832,26 @@ function render(){
       <td class="${l.d < 0 ? 'neg' : ''}">${fmtR(l.d)}</td>
       <td style="text-align:center"><span class="pill ${l.cls}">${l.txt}</span></td>
     </tr>`).join('');
+
+  // lançamentos do mês (tabela crua, com filtro de categoria principal)
+  const catFiltro = document.getElementById('fCatFiltro').value;
+  let lanc = lancamentosDoMes(mes, ano);
+  if (catFiltro) lanc = lanc.filter(t => norm(t.catP) === norm(catFiltro));
+  lanc = lanc.slice().sort((a,b) => {
+    const da = isCredito(a) ? a.dataFat : a.dataLanc, db = isCredito(b) ? b.dataFat : b.dataLanc;
+    return (da && db) ? da - db : 0;
+  });
+  document.getElementById('tbFluxoDetalhe').innerHTML = lanc.length ? lanc.map(t => {
+    const d = isCredito(t) ? t.dataFat : t.dataLanc;
+    return `<tr>
+      <td>${d ? d.toLocaleDateString('pt-BR') : '—'}</td>
+      <td style="text-align:left">${t.catS || '—'}</td>
+      <td style="text-align:left">${t.meio || '—'}</td>
+      <td style="text-align:left">${t.conta || '—'}</td>
+      <td style="text-align:left">${t.pagador || '—'}</td>
+      <td class="${t.valor < 0 ? 'neg' : ''}">${fmtR(t.valor)}</td>
+    </tr>`;
+  }).join('') : '<tr><td colspan="6" style="text-align:center;color:var(--ink-2)">Nenhum lançamento neste período.</td></tr>';
 
   drawCat(linhas);
   drawFluxo(ano);
@@ -953,7 +1010,7 @@ function demo(){
     const f = df ? df.split('-').map(Number) : null;
     return { dataLanc:new Date(a,m-1,d), dataFat: f ? new Date(f[0],f[1]-1,f[2]) : null,
              mesRef:m, ano:a, mesFat:f?f[1]:null, anoFat:f?f[0]:null,
-             catP:cp, catS:cs, tipo:norm(tipo), valor, meio:norm(meio), conta, natureza:'' };
+             catP:cp, catS:cs, tipo:norm(tipo), valor, meio:norm(meio), conta, natureza:'', pagador:'EU' };
   };
   BASE = [
     mk('2026-07-05',null,'Renda','Salário','Entrada',1028.85,'Pix','Itaú'),
@@ -1081,6 +1138,7 @@ async function salvarLancamento(){
 
   document.getElementById('selMes').addEventListener('change', render);
   document.getElementById('selAno').addEventListener('change', render);
+  document.getElementById('fCatFiltro').addEventListener('change', render);
   document.getElementById('btnReload').addEventListener('click', () => CFG.id ? loadAll() : demo());
   document.getElementById('btnExport').addEventListener('click', exportXLSX);
   document.getElementById('btnDemo').addEventListener('click', demo);
