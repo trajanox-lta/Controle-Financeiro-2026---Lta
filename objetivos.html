@@ -122,6 +122,22 @@ const norm = s => String(s ?? '')
   .normalize('NFD').replace(/[\u0300-\u036f]/g,'')
   .trim().toLowerCase();
 
+// Escapa texto vindo da planilha antes de inserir no HTML — a aba Objetivos
+// pode ser editada por outras pessoas, então nunca confiamos em texto livre
+// indo direto pro innerHTML.
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({
+  '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;'
+}[c]));
+
+// Só aceita URLs http/https de verdade como imagem — bloqueia "javascript:"
+// e qualquer outra coisa que não seja uma URL de imagem legítima.
+function urlImagemSegura(v){
+  const s = String(v ?? '').trim();
+  if (!/^https:\/\//i.test(s)) return '';
+  try { new URL(s); } catch { return ''; }
+  return s;
+}
+
 const brl = new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'});
 const fmtR = v => (v === 0 || v == null || isNaN(v)) ? '—' : brl.format(v);
 
@@ -307,19 +323,20 @@ function render(){
     const va = vaDoObjetivo(g.objetivo);
     const pct = g.valorMeta ? Math.min(100, Math.round(va / g.valorMeta * 100)) : 0;
     const meses = mesesRestantes(g.dataLimite);
-    const imgHtml = g.imagem
-      ? `<div class="img" style="background-image:url('${g.imagem}')"><span class="cat">${g.categoria || '—'}</span></div>`
-      : `<div class="img noimg"><span class="cat">${g.categoria || '—'}</span>Sem imagem</div>`;
+    const imgSegura = urlImagemSegura(g.imagem);
+    const imgHtml = imgSegura
+      ? `<div class="img" style="background-image:url('${esc(imgSegura)}')"><span class="cat">${esc(g.categoria) || '—'}</span></div>`
+      : `<div class="img noimg"><span class="cat">${esc(g.categoria) || '—'}</span>Sem imagem</div>`;
     return `<div class="goal">
       ${imgHtml}
       <div class="content">
-        <h3>${g.objetivo}</h3>
+        <h3>${esc(g.objetivo)}</h3>
         <div class="amounts"><span><b>${fmtR(va)}</b> de ${fmtR(g.valorMeta)}</span><span>${pct}%</span></div>
         <div class="bar"><i class="${pct>=100?'done':''}" style="width:${pct}%"></i></div>
         <div class="row"><span>Aporte mensal</span><span>${fmtR(g.aporteMensal)}</span></div>
         <div class="row"><span>Prazo</span><span>${g.dataLimite ? g.dataLimite.toLocaleDateString('pt-BR') : '—'}</span></div>
         <div class="row"><span>Tempo restante</span><span>${meses != null ? meses + ' meses' : '—'}</span></div>
-        <div class="row"><span>Status</span><span><span class="pill ${statusClasse(g.status)}">${g.status || '—'}</span></span></div>
+        <div class="row"><span>Status</span><span><span class="pill ${statusClasse(g.status)}">${esc(g.status) || '—'}</span></span></div>
       </div>
     </div>`;
   }).join('') || '<p style="color:var(--ink-2);font-size:13px">Nenhuma meta cadastrada na aba Objetivos.</p>';

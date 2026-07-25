@@ -433,6 +433,13 @@ const norm = s => String(s ?? '')
   .normalize('NFD').replace(/[\u0300-\u036f]/g,'')
   .trim().toLowerCase();
 
+// Escapa texto vindo da planilha antes de inserir no HTML — a aba Fluxo de
+// caixa/Categorias pode ser editada por outras pessoas da família, então
+// nunca confiamos em texto livre indo direto pro innerHTML.
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({
+  '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;'
+}[c]));
+
 function setStatus(msg, kind){
   const el = document.getElementById('status');
   el.className = 'status show ' + (kind || 'info');
@@ -820,7 +827,7 @@ function render(){
   });
   document.getElementById('tbCategorias').innerHTML = linhas.map(l => `
     <tr>
-      <td>${l.cat}</td>
+      <td>${esc(l.cat)}</td>
       <td>${fmtR(l.p)}</td>
       <td>${fmtR(l.r)}</td>
       <td class="${l.d < 0 ? 'neg' : ''}">${fmtR(l.d)}</td>
