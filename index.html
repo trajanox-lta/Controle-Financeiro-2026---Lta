@@ -123,6 +123,14 @@ var o=[];var l=Array.isArray(e);for(f=n.s.c;f<=n.e.c;++f)s[f]=ya(f);for(var c=n.
   .cc .row{display:flex;justify-content:space-between;align-items:baseline;padding:5px 0;font-size:13px}
   .cc .row span:first-child{color:#bfcbe6}
   .cc .row span:last-child{font-weight:600}
+  .cc .row.hl{background:rgba(255,209,122,.12);border-radius:6px;margin:2px -8px;padding:6px 8px}
+  .cc .row.hl span:first-child{color:#ffd17a}
+  .cc .row.hl span:last-child{color:#ffd17a}
+  .cc-total{background:var(--navy);border-radius:var(--radius);padding:18px;color:#fff;text-align:center;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px}
+  .cc-total h3{margin:0;font-size:14px;font-weight:600;letter-spacing:.05em;text-transform:uppercase}
+  .cc-pill{display:inline-flex;align-items:center;gap:12px;border:1px solid rgba(255,255,255,.4);border-radius:999px;padding:8px 20px}
+  .cc-pill .lbl{font-size:12px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:#fff;opacity:.92}
+  .cc-pill .val{font-size:16px;font-weight:700;color:#fff}
   .bar{height:6px;background:rgba(255,255,255,.22);border-radius:4px;overflow:hidden;margin-top:10px}
   .bar > i{display:block;height:100%;background:var(--blue)}
   .bar > i.hot{background:var(--red)}
@@ -753,7 +761,12 @@ function render(){
   document.getElementById('kContasTotal').textContent = fmtR(total);
 
   // cartões
-  document.getElementById('boxCartoes').innerHTML = CARTOES.map(c => {
+  const totalDividaCartoes = CARTOES.reduce((s, c) => s + gastoCartao(c, mes, ano), 0);
+  const totalCartaoCardHtml = `<div class="cc-total">
+      <h3>Total de cartões</h3>
+      <div class="cc-pill"><span class="lbl">Dívida Mês</span><span class="val">${fmtR(-totalDividaCartoes)}</span></div>
+    </div>`;
+  document.getElementById('boxCartoes').innerHTML = totalCartaoCardHtml + CARTOES.map(c => {
     const lim = CFG.limites[c] || 0;
     const gasto = gastoCartao(c, mes, ano);
     const disp = lim - gasto;
@@ -761,7 +774,7 @@ function render(){
     return `<div class="cc">
       <h3>${c}</h3>
       <div class="row"><span>Limite inicial</span><span>${fmtR(lim)}</span></div>
-      <div class="row"><span>Gasto do mês</span><span>${fmtR(gasto)}</span></div>
+      <div class="row hl"><span>Gasto do mês</span><span>${fmtR(gasto)}</span></div>
       <div class="row"><span>Disponível</span><span>${fmtR(disp)}</span></div>
       <div class="bar"><i class="${pct>=90?'hot':''}" style="width:${pct}%"></i></div>
     </div>`;
