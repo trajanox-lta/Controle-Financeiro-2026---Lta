@@ -114,7 +114,7 @@
 /* ============================================================
    Config / util — mesmo esquema do dashboard principal
    ============================================================ */
-let CFG = {id:'', abaObjetivos:'Objetivos', abaAportes:'Aportes'};
+let CFG = {id:'', abaObjetivos:'Objetivos', abaAportes:'Aportes', scriptUrl:'', scriptKey:''};
 let OBJETIVOS = [];
 let APORTES = [];
 
@@ -259,12 +259,26 @@ const sheetURL = (id, aba) =>
   `https://docs.google.com/spreadsheets/d/${id}/gviz/tq?tqx=out:csv&sheet=${encodeURIComponent(aba)}`;
 
 async function fetchSheet(id, aba){
+  // Mesmo esquema do dashboard principal: se o conector estiver configurado,
+  // lê por ele (funciona com a planilha privada); senão, cai no CSV público.
+  if (CFG.scriptUrl) return fetchSheetViaScript(aba);
+
   const res = await fetch(sheetURL(id, aba));
   if (!res.ok) throw new Error(`Não consegui ler a aba "${aba}" (HTTP ${res.status}).`);
   let txt = await res.text();
-  if (txt.trim().startsWith('<')) throw new Error('A planilha respondeu com uma página de login. Compartilhe como "Qualquer pessoa com o link — Leitor".');
+  if (txt.trim().startsWith('<')) throw new Error('A planilha respondeu com uma página de login. Compartilhe como "Qualquer pessoa com o link — Leitor", ou configure o conector para ler com a planilha privada.');
   txt = fixMojibake(txt);
   return parseCSV(txt);
+}
+
+async function fetchSheetViaScript(aba){
+  const url = CFG.scriptUrl + '?acao=aba&nome=' + encodeURIComponent(aba) +
+              (CFG.scriptKey ? '&chave=' + encodeURIComponent(CFG.scriptKey) : '');
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(`Conector respondeu com erro (HTTP ${res.status}) ao ler a aba "${aba}".`);
+  const data = await res.json();
+  if (!data.ok) throw new Error(data.erro || `Conector não conseguiu ler a aba "${aba}".`);
+  return data.linhas;
 }
 
 function toObjects(rows, canonHeaders, minMatches){

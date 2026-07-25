@@ -594,12 +594,27 @@ function fixMojibake(s){
 }
 
 async function fetchSheet(id, aba){
+  // Se o conector (Apps Script) estiver configurado, lê por ele — funciona
+  // mesmo com a planilha privada, porque o script roda com a autorização do
+  // dono. Sem conector configurado, cai no CSV público como antes.
+  if (CFG.scriptUrl) return fetchSheetViaScript(aba);
+
   const res = await fetch(sheetURL(id, aba));
   if (!res.ok) throw new Error(`Não consegui ler a aba "${aba}" (HTTP ${res.status}). Confira o nome da aba e o compartilhamento da planilha.`);
   let txt = await res.text();
-  if (txt.trim().startsWith('<')) throw new Error('A planilha respondeu com uma página de login. Compartilhe como "Qualquer pessoa com o link — Leitor".');
+  if (txt.trim().startsWith('<')) throw new Error('A planilha respondeu com uma página de login. Compartilhe como "Qualquer pessoa com o link — Leitor", ou configure o conector para ler com a planilha privada.');
   txt = fixMojibake(txt);
   return parseCSV(txt);
+}
+
+async function fetchSheetViaScript(aba){
+  const url = CFG.scriptUrl + '?acao=aba&nome=' + encodeURIComponent(aba) +
+              (CFG.scriptKey ? '&chave=' + encodeURIComponent(CFG.scriptKey) : '');
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(`Conector respondeu com erro (HTTP ${res.status}) ao ler a aba "${aba}".`);
+  const data = await res.json();
+  if (!data.ok) throw new Error(data.erro || `Conector não conseguiu ler a aba "${aba}".`);
+  return data.linhas; // já vem como matriz de valores — sem precisar parsear CSV
 }
 
 function normalizeBase(objs){
