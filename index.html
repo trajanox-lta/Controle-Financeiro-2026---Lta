@@ -228,6 +228,7 @@ var o=[];var l=Array.isArray(e);for(f=n.s.c;f<=n.e.c;++f)s[f]=ya(f);for(var c=n.
       </label>
       <button id="btnNovo" class="hidden">+ Novo lançamento</button>
       <a id="btnObjetivos" class="btnlike ghost" href="objetivos.html" style="margin-left:auto">🎯 Objetivos</a>
+      <button id="btnEditarConexao" class="ghost">⚙️ Editar conexão</button>
       <button id="btnReload" class="ghost">Atualizar dados</button>
       <button id="btnExport" disabled>Exportar para Excel</button>
     </div>
@@ -1136,6 +1137,11 @@ async function salvarLancamento(){
   document.getElementById('selMes').addEventListener('change', render);
   document.getElementById('selAno').addEventListener('change', render);
   document.getElementById('btnReload').addEventListener('click', () => CFG.id ? loadAll() : demo());
+  document.getElementById('btnEditarConexao').addEventListener('click', () => {
+    formFromCfg(CFG);
+    document.getElementById('dash').classList.add('hidden');
+    document.getElementById('setup').classList.remove('hidden');
+  });
   document.getElementById('btnExport').addEventListener('click', exportXLSX);
   document.getElementById('btnDemo').addEventListener('click', demo);
 
