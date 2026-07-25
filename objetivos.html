@@ -138,6 +138,16 @@ function urlImagemSegura(v){
   return s;
 }
 
+// O link que o Google Drive gera ao "Compartilhar" (.../file/d/ID/view) é uma
+// PÁGINA de visualização em HTML, não a imagem em si — usada direto como
+// imagem de fundo, não aparece nada. Convertemos para o endpoint de imagem
+// direta do Drive antes de exibir.
+function converterUrlDrive(v){
+  const s = String(v ?? '').trim();
+  const m = s.match(/drive\.google\.com\/file\/d\/([^/]+)/);
+  return m ? `https://drive.google.com/thumbnail?id=${m[1]}&sz=w1000` : s;
+}
+
 const brl = new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'});
 const fmtR = v => (v === 0 || v == null || isNaN(v)) ? '—' : brl.format(v);
 
@@ -323,7 +333,7 @@ function render(){
     const va = vaDoObjetivo(g.objetivo);
     const pct = g.valorMeta ? Math.min(100, Math.round(va / g.valorMeta * 100)) : 0;
     const meses = mesesRestantes(g.dataLimite);
-    const imgSegura = urlImagemSegura(g.imagem);
+    const imgSegura = urlImagemSegura(converterUrlDrive(g.imagem));
     const imgHtml = imgSegura
       ? `<div class="img" style="background-image:url('${esc(imgSegura)}')"><span class="cat">${esc(g.categoria) || '—'}</span></div>`
       : `<div class="img noimg"><span class="cat">${esc(g.categoria) || '—'}</span>Sem imagem</div>`;
