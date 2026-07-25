@@ -1,0 +1,372 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Objetivos — Controle Financeiro 2026</title>
+<style>
+  :root{
+    --navy:#1B2A56; --navy-2:#24356b; --green:#2FA84F; --red:#E14B4B;
+    --blue:#2E86DE; --purple:#7D3C98; --amber:#EDA100;
+    --page:#eef1f6; --card:#ffffff; --ink:#1a1f2e; --ink-2:#5b6478; --line:#dfe4ec;
+    --ok-bg:#C6E0B4; --ok-ink:#274e13;
+    --warn-bg:#FFE699; --warn-ink:#6b4e00;
+    --bad-bg:#F8CBAD; --bad-ink:#7a2e10;
+    --radius:10px;
+  }
+  *{box-sizing:border-box}
+  body{
+    margin:0; background:var(--page); color:var(--ink);
+    font-family:"Segoe UI",system-ui,-apple-system,Roboto,Arial,sans-serif;
+    font-variant-numeric:tabular-nums;
+  }
+  .wrap{max-width:1180px;margin:0 auto;padding:24px 20px 60px}
+
+  header.top{display:flex;flex-wrap:wrap;gap:16px;align-items:flex-end;justify-content:space-between;margin-bottom:20px}
+  h1{font-size:24px;font-weight:600;color:var(--navy);margin:0}
+  .sub{font-size:13px;color:var(--ink-2);margin:4px 0 0}
+
+  .controls{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+  button, a.btnlike{
+    font:inherit;font-size:14px;padding:8px 14px;border-radius:6px;cursor:pointer;
+    border:1px solid var(--navy);background:var(--navy);color:#fff;
+    text-decoration:none;display:inline-flex;align-items:center;
+  }
+  button:hover, a.btnlike:hover{background:var(--navy-2)}
+  button.ghost, a.btnlike.ghost{background:#fff;color:var(--navy)}
+  button.ghost:hover, a.btnlike.ghost:hover{background:#f2f5fa}
+  button:disabled{opacity:.5;cursor:not-allowed}
+
+  .panel{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);overflow:hidden;margin-bottom:18px}
+  .panel > h2{
+    margin:0;padding:12px 18px;background:var(--navy);color:#fff;
+    font-size:14px;font-weight:600;letter-spacing:.05em;text-transform:uppercase;
+  }
+  .panel .body{padding:16px 18px}
+
+  .goals{display:grid;gap:18px;grid-template-columns:repeat(auto-fit,minmax(280px,1fr))}
+  .goal{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);overflow:hidden;display:flex;flex-direction:column}
+  .goal .img{width:100%;height:150px;background:#dfe4ec center/cover no-repeat;position:relative}
+  .goal .img.noimg{display:flex;align-items:center;justify-content:center;color:var(--ink-2);font-size:12px}
+  .goal .cat{position:absolute;top:10px;left:10px;background:rgba(27,42,86,.85);color:#fff;font-size:11px;
+             font-weight:600;text-transform:uppercase;letter-spacing:.04em;padding:3px 9px;border-radius:20px}
+  .goal .content{padding:16px 18px;display:flex;flex-direction:column;gap:10px;flex:1}
+  .goal h3{margin:0;font-size:16px;color:var(--navy)}
+  .goal .amounts{display:flex;justify-content:space-between;align-items:baseline;font-size:13px;color:var(--ink-2)}
+  .goal .amounts b{font-size:15px;color:var(--ink);font-weight:600}
+  .bar{height:8px;background:#e4e8f0;border-radius:4px;overflow:hidden}
+  .bar > i{display:block;height:100%;background:var(--blue)}
+  .bar > i.done{background:var(--green)}
+  .goal .pct{font-size:12px;color:var(--ink-2);text-align:right}
+  .goal .row{display:flex;justify-content:space-between;font-size:13px;padding:2px 0}
+  .goal .row span:first-child{color:var(--ink-2)}
+  .goal .row span:last-child{font-weight:600}
+  .pill{display:inline-block;padding:3px 10px;border-radius:20px;font-size:12px;font-weight:600;white-space:nowrap}
+  .st-ok{background:var(--ok-bg);color:var(--ok-ink)}
+  .st-warn{background:var(--warn-bg);color:var(--warn-ink)}
+  .st-bad{background:var(--bad-bg);color:var(--bad-ink)}
+  .st-neutral{background:#e4e8f0;color:var(--ink-2)}
+
+  .setup{background:#fff;border:1px solid var(--line);border-radius:var(--radius);padding:18px;margin-bottom:18px}
+  .setup h2{margin:0 0 4px;font-size:16px;color:var(--navy)}
+  .setup p{margin:0 0 14px;font-size:13px;color:var(--ink-2);line-height:1.6}
+
+  .status{font-size:13px;padding:10px 14px;border-radius:6px;margin-bottom:14px;display:none}
+  .status.show{display:block}
+  .status.err{background:#fdecea;color:#7a2018;border:1px solid #f5c6c0}
+  .status.info{background:#eaf2fd;color:#123a6b;border:1px solid #c3d9f5}
+  .status.ok{background:#e9f6ec;color:#1d5a2c;border:1px solid #c2e4cb}
+  .meta{font-size:12px;color:var(--ink-2);margin-top:6px}
+  .hidden{display:none !important}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <div>
+      <h1>Objetivos financeiros</h1>
+      <p class="sub">Metas, aportes e prazos — dados lidos da planilha</p>
+    </div>
+    <div class="controls">
+      <a class="btnlike ghost" href="index.html">← Voltar ao Dashboard</a>
+      <button id="btnReload" class="ghost">Atualizar dados</button>
+    </div>
+  </header>
+
+  <div id="status" class="status"></div>
+
+  <section class="setup" id="setup">
+    <h2>Ainda não conectado</h2>
+    <p>Volte ao Dashboard principal e conecte sua planilha por lá — esta página usa a mesma conexão automaticamente.</p>
+  </section>
+
+  <section class="panel hidden" id="painelMetas">
+    <h2>Metas</h2>
+    <div class="body">
+      <div class="goals" id="boxMetas"></div>
+    </div>
+  </section>
+
+  <p class="meta" id="footMeta"></p>
+</div>
+
+<script>
+/* ============================================================
+   Config / util — mesmo esquema do dashboard principal
+   ============================================================ */
+let CFG = {id:'', abaObjetivos:'Objetivos', abaAportes:'Aportes'};
+let OBJETIVOS = [];
+let APORTES = [];
+
+const norm = s => String(s ?? '')
+  .normalize('NFD').replace(/[\u0300-\u036f]/g,'')
+  .trim().toLowerCase();
+
+const brl = new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'});
+const fmtR = v => (v === 0 || v == null || isNaN(v)) ? '—' : brl.format(v);
+
+function setStatus(msg, kind){
+  const el = document.getElementById('status');
+  el.className = 'status show ' + (kind || 'info');
+  el.textContent = msg;
+}
+function clearStatus(){ document.getElementById('status').className = 'status'; }
+
+function pick(obj, name){
+  const k = Object.keys(obj).find(k => norm(k) === norm(name));
+  return k ? obj[k] : undefined;
+}
+
+// Aceita "1.234,56", "1234.56", "R$ -1.234,56", "(1.234,56)"
+function parseNum(v){
+  if (typeof v === 'number') return v;
+  let s = String(v ?? '').trim();
+  if (!s || s === '-' || s === 'N/A') return 0;
+  let neg = false;
+  if (/^\(.*\)$/.test(s)){ neg = true; s = s.slice(1,-1); }
+  s = s.replace(/R\$/gi,'').replace(/\s|\u00a0/g,'');
+  if (s.startsWith('-')){ neg = true; s = s.slice(1); }
+  const hasDot = s.includes('.'), hasComma = s.includes(',');
+  if (hasDot && hasComma)      s = s.replace(/\./g,'').replace(',','.');
+  else if (hasComma)           s = s.replace(',','.');
+  const n = parseFloat(s);
+  if (isNaN(n)) return 0;
+  return neg ? -n : n;
+}
+
+// Data Limite em Objetivos aparece como M/D/AAAA (ex: 12/31/2026, 3/1/2027) —
+// convenção diferente da Data Lançamento do Fluxo de caixa (DD/MM/AAAA).
+// Se o primeiro número não puder ser mês (>12), assume DD/MM; senão MM/DD.
+function parseDataLimite(v){
+  const s = String(v ?? '').trim();
+  if (!s || s === 'N/A' || s === '-') return null;
+  let m = s.match(/^Date\((\d+),(\d+),(\d+)/);
+  if (m) return new Date(+m[1], +m[2], +m[3]);
+  m = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (m) return new Date(+m[1], +m[2]-1, +m[3]);
+  m = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+  if (m){
+    const a = +m[1], b = +m[2], y = +m[3];
+    return a > 12 ? new Date(y, b-1, a) : new Date(y, a-1, b);
+  }
+  const d = new Date(s);
+  return isNaN(d) ? null : d;
+}
+
+function mesesRestantes(dataLimite){
+  if (!dataLimite) return null;
+  const hoje = new Date();
+  const meses = (dataLimite.getFullYear() - hoje.getFullYear()) * 12 +
+                (dataLimite.getMonth() - hoje.getMonth());
+  return meses;
+}
+
+function parseCSV(text){
+  const rows = []; let row = [], field = '', q = false;
+  for (let i = 0; i < text.length; i++){
+    const c = text[i];
+    if (q){
+      if (c === '"'){ if (text[i+1] === '"'){ field += '"'; i++; } else q = false; }
+      else field += c;
+    } else {
+      if (c === '"') q = true;
+      else if (c === ','){ row.push(field); field = ''; }
+      else if (c === '\n'){ row.push(field); rows.push(row); row = []; field = ''; }
+      else if (c !== '\r') field += c;
+    }
+  }
+  if (field.length || row.length){ row.push(field); rows.push(row); }
+  return rows;
+}
+
+const CP1252_ESPECIAIS = {
+  0x20AC:0x80, 0x201A:0x82, 0x0192:0x83, 0x201E:0x84, 0x2026:0x85, 0x2020:0x86,
+  0x2021:0x87, 0x02C6:0x88, 0x2030:0x89, 0x0160:0x8A, 0x2039:0x8B, 0x0152:0x8C,
+  0x017D:0x8E, 0x2018:0x91, 0x2019:0x92, 0x201C:0x93, 0x201D:0x94, 0x2022:0x95,
+  0x2013:0x96, 0x2014:0x97, 0x02DC:0x98, 0x2122:0x99, 0x0161:0x9A, 0x203A:0x9B,
+  0x0153:0x9C, 0x017E:0x9E, 0x0178:0x9F
+};
+function cp1252Byte(ch){
+  const code = ch.codePointAt(0);
+  if (code < 0x80) return code;
+  if (code <= 0xFF) return CP1252_ESPECIAIS[code] ?? code;
+  return CP1252_ESPECIAIS[code] ?? null;
+}
+function fixMojibake(s){
+  let out = '', run = [], runText = '';
+  const flush = () => {
+    if (!run.length) return;
+    try { out += new TextDecoder('utf-8', { fatal: true }).decode(Uint8Array.from(run)); }
+    catch(e){ out += runText; }
+    run = []; runText = '';
+  };
+  for (const ch of s){
+    const b = ch.codePointAt(0) >= 0x80 ? cp1252Byte(ch) : null;
+    if (b !== null){ run.push(b); runText += ch; }
+    else { flush(); out += ch; }
+  }
+  flush();
+  return out;
+}
+
+const sheetURL = (id, aba) =>
+  `https://docs.google.com/spreadsheets/d/${id}/gviz/tq?tqx=out:csv&sheet=${encodeURIComponent(aba)}`;
+
+async function fetchSheet(id, aba){
+  const res = await fetch(sheetURL(id, aba));
+  if (!res.ok) throw new Error(`Não consegui ler a aba "${aba}" (HTTP ${res.status}).`);
+  let txt = await res.text();
+  if (txt.trim().startsWith('<')) throw new Error('A planilha respondeu com uma página de login. Compartilhe como "Qualquer pessoa com o link — Leitor".');
+  txt = fixMojibake(txt);
+  return parseCSV(txt);
+}
+
+function toObjects(rows, canonHeaders, minMatches){
+  const canonNorm = canonHeaders.map(norm);
+  minMatches = minMatches || Math.min(3, canonHeaders.length);
+  let hi = -1, bestScore = -1;
+  for (let i = 0; i < Math.min(rows.length, 30); i++){
+    const cells = rows[i].map(norm);
+    let score = 0;
+    canonNorm.forEach(w => { if (cells.includes(w)) score++; });
+    if (score > bestScore){ bestScore = score; hi = i; }
+  }
+  if (hi === -1 || bestScore < minMatches){
+    throw new Error('Cabeçalho não encontrado. Esperava colunas como: ' + canonHeaders.slice(0,4).join(', '));
+  }
+  const rawHead = rows[hi];
+  const head = canonHeaders.map((name, idx) => {
+    const cellText = String(rawHead[idx] ?? '').trim();
+    return cellText || name;
+  });
+  return rows.slice(hi+1)
+    .filter(r => r.some(c => String(c).trim() !== ''))
+    .map(r => { const o = {}; head.forEach((h,i) => { if (h) o[h] = r[i]; }); return o; });
+}
+
+const CANON_OBJETIVOS = ['ID','Objetivo','Categoria','Valor Meta','VA','%','Aporte Mensal','Data Limite','Tempo Restante','Status','Imagem'];
+const CANON_APORTES   = ['Data','Categoria do aporte','Conta vinculada','Valor'];
+
+function normalizeObjetivos(objs){
+  return objs.map(o => ({
+    id:           String(pick(o,'ID') ?? '').trim(),
+    objetivo:     String(pick(o,'Objetivo') ?? '').trim(),
+    categoria:    String(pick(o,'Categoria') ?? '').trim(),
+    valorMeta:    parseNum(pick(o,'Valor Meta')),
+    aporteMensal: parseNum(pick(o,'Aporte Mensal')),
+    dataLimite:   parseDataLimite(pick(o,'Data Limite')),
+    status:       String(pick(o,'Status') ?? '').trim(),
+    imagem:       String(pick(o,'Imagem') ?? '').trim(),
+  })).filter(r => r.objetivo);
+}
+function normalizeAportes(objs){
+  return objs.map(o => ({
+    categoria: String(pick(o,'Categoria do aporte') ?? '').trim(),
+    valor:     parseNum(pick(o,'Valor')),
+  })).filter(r => r.categoria);
+}
+
+function vaDoObjetivo(nomeObjetivo){
+  return APORTES.filter(a => norm(a.categoria) === norm(nomeObjetivo))
+                .reduce((s,a) => s + a.valor, 0);
+}
+
+function statusClasse(status){
+  const n = norm(status);
+  if (n.includes('atrasad')) return 'st-bad';
+  if (n.includes('risco'))   return 'st-warn';
+  if (n.includes('conclu') || n.includes('planejado') || n.includes('caminho')) return 'st-ok';
+  return 'st-neutral';
+}
+
+/* ============================================================
+   Render
+   ============================================================ */
+function render(){
+  document.getElementById('boxMetas').innerHTML = OBJETIVOS.map(g => {
+    const va = vaDoObjetivo(g.objetivo);
+    const pct = g.valorMeta ? Math.min(100, Math.round(va / g.valorMeta * 100)) : 0;
+    const meses = mesesRestantes(g.dataLimite);
+    const imgHtml = g.imagem
+      ? `<div class="img" style="background-image:url('${g.imagem}')"><span class="cat">${g.categoria || '—'}</span></div>`
+      : `<div class="img noimg"><span class="cat">${g.categoria || '—'}</span>Sem imagem</div>`;
+    return `<div class="goal">
+      ${imgHtml}
+      <div class="content">
+        <h3>${g.objetivo}</h3>
+        <div class="amounts"><span><b>${fmtR(va)}</b> de ${fmtR(g.valorMeta)}</span><span>${pct}%</span></div>
+        <div class="bar"><i class="${pct>=100?'done':''}" style="width:${pct}%"></i></div>
+        <div class="row"><span>Aporte mensal</span><span>${fmtR(g.aporteMensal)}</span></div>
+        <div class="row"><span>Prazo</span><span>${g.dataLimite ? g.dataLimite.toLocaleDateString('pt-BR') : '—'}</span></div>
+        <div class="row"><span>Tempo restante</span><span>${meses != null ? meses + ' meses' : '—'}</span></div>
+        <div class="row"><span>Status</span><span><span class="pill ${statusClasse(g.status)}">${g.status || '—'}</span></span></div>
+      </div>
+    </div>`;
+  }).join('') || '<p style="color:var(--ink-2);font-size:13px">Nenhuma meta cadastrada na aba Objetivos.</p>';
+}
+
+async function loadAll(){
+  setStatus('Carregando metas da planilha…','info');
+  document.getElementById('btnReload').disabled = true;
+  try{
+    const [rawObj, rawApo] = await Promise.all([
+      fetchSheet(CFG.id, CFG.abaObjetivos),
+      fetchSheet(CFG.id, CFG.abaAportes)
+    ]);
+    OBJETIVOS = normalizeObjetivos(toObjects(rawObj, CANON_OBJETIVOS));
+    APORTES   = normalizeAportes(toObjects(rawApo, CANON_APORTES));
+    document.getElementById('setup').classList.add('hidden');
+    document.getElementById('painelMetas').classList.remove('hidden');
+    render();
+    setStatus(`Dados atualizados · ${OBJETIVOS.length} metas.`,'ok');
+    setTimeout(clearStatus, 4000);
+    document.getElementById('footMeta').textContent =
+      'Atualizado em ' + new Date().toLocaleString('pt-BR');
+  } catch(e){
+    setStatus(e.message, 'err');
+  } finally {
+    document.getElementById('btnReload').disabled = false;
+  }
+}
+
+function readHash(){
+  if (!location.hash.length) return null;
+  try { return JSON.parse(decodeURIComponent(escape(atob(location.hash.slice(1))))); }
+  catch { return null; }
+}
+
+/* ============================================================
+   Boot
+   ============================================================ */
+(function init(){
+  document.getElementById('btnReload').addEventListener('click', () => { if (CFG.id) loadAll(); });
+
+  const saved = readHash();
+  if (saved && saved.id){
+    CFG = {...CFG, ...saved};
+    loadAll();
+  }
+})();
+</script>
+</body>
+</html>
