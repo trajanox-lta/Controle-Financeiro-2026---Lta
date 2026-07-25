@@ -75,13 +75,14 @@ var o=[];var l=Array.isArray(e);for(f=n.s.c;f<=n.e.c;++f)s[f]=ya(f);for(var c=n.
     border-radius:6px;background:#fff;color:var(--ink);min-width:120px;
   }
   select:focus,input:focus{outline:2px solid var(--blue);outline-offset:1px}
-  button{
+  button, a.btnlike{
     font:inherit;font-size:14px;padding:8px 14px;border-radius:6px;cursor:pointer;
     border:1px solid var(--navy);background:var(--navy);color:#fff;
+    text-decoration:none;display:inline-flex;align-items:center;
   }
-  button:hover{background:var(--navy-2)}
-  button.ghost{background:#fff;color:var(--navy)}
-  button.ghost:hover{background:#f2f5fa}
+  button:hover, a.btnlike:hover{background:var(--navy-2)}
+  button.ghost, a.btnlike.ghost{background:#fff;color:var(--navy)}
+  button.ghost:hover, a.btnlike.ghost:hover{background:#f2f5fa}
   button:disabled{opacity:.5;cursor:not-allowed}
 
   /* ---- cards ---- */
@@ -99,6 +100,12 @@ var o=[];var l=Array.isArray(e);for(f=n.s.c;f<=n.e.c;++f)s[f]=ya(f);for(var c=n.
   .c-teal{background:#148F77}
   .c-orange{background:#C0663A}
   .c-gold{background:#B8860B}
+  .invest-pill{display:flex;justify-content:space-between;align-items:center;border-radius:999px;
+    padding:10px 20px;margin-bottom:10px;font-weight:700;font-size:14px;color:#fff}
+  .invest-pill:last-child{margin-bottom:0}
+  .invest-pill.invest-gold{background:#B8860B}
+  .invest-pill.invest-orange{background:#C0663A}
+  .invest-pill.invest-total{background:var(--navy);border:1px solid rgba(255,255,255,.4)}
   .viewlabel{font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:.04em;
              color:#3A3F58;background:#eef0f5;border-radius:6px;padding:7px 12px;margin:0 0 10px}
 
@@ -220,6 +227,7 @@ var o=[];var l=Array.isArray(e);for(f=n.s.c;f<=n.e.c;++f)s[f]=ya(f);for(var c=n.
         <select id="selMes"></select>
       </label>
       <button id="btnNovo" class="hidden">+ Novo lançamento</button>
+      <a id="btnObjetivos" class="btnlike ghost" href="objetivos.html" style="margin-left:auto">🎯 Objetivos</a>
       <button id="btnReload" class="ghost">Atualizar dados</button>
       <button id="btnExport" disabled>Exportar para Excel</button>
     </div>
@@ -307,6 +315,11 @@ var o=[];var l=Array.isArray(e);for(f=n.s.c;f<=n.e.c;++f)s[f]=ya(f);for(var c=n.
     </section>
 
     <section class="panel">
+      <h2>Investimentos</h2>
+      <div class="body" id="boxInvest"></div>
+    </section>
+
+    <section class="panel">
       <h2>Cartões de crédito <span style="font-weight:400;text-transform:none;letter-spacing:0;opacity:.8">— gasto por data de fatura</span></h2>
       <div class="body"><div class="grid cards-cc" id="boxCartoes"></div></div>
     </section>
@@ -317,19 +330,6 @@ var o=[];var l=Array.isArray(e);for(f=n.s.c;f<=n.e.c;++f)s[f]=ya(f);for(var c=n.
         <table>
           <thead><tr><th>Categoria</th><th>Planejado</th><th>Realizado</th><th>Diferença</th><th style="text-align:center">Status</th></tr></thead>
           <tbody id="tbCategorias"></tbody>
-        </table>
-      </div>
-    </section>
-
-    <section class="panel">
-      <h2>Fluxo de caixa — lançamentos <span style="font-weight:400;text-transform:none;letter-spacing:0;opacity:.8">— do mês selecionado no topo</span></h2>
-      <div class="body">
-        <label class="fld" style="margin-bottom:12px;max-width:260px">Categoria principal
-          <select id="fCatFiltro"><option value="">Todas as categorias</option></select>
-        </label>
-        <table>
-          <thead><tr><th>Data</th><th>Categoria secundária</th><th>Meio</th><th>Conta</th><th>Pagador</th><th>Valor</th></tr></thead>
-          <tbody id="tbFluxoDetalhe"></tbody>
         </table>
       </div>
     </section>
@@ -417,6 +417,10 @@ const CONTAS  = [
   {nome:'Itaú',   cls:'c-blue'},
   {nome:'Nubank', cls:'c-purple'},
   {nome:'Picpay', cls:'c-green'}
+];
+const INVESTIMENTOS = [
+  {nome:'Binance',  cls:'invest-gold'},
+  {nome:'Cofrinho', cls:'invest-orange'}
 ];
 const COR = {green:'#2FA84F', red:'#E14B4B', navy:'#1B2A56', blue:'#2E86DE',
              purple:'#7D3C98', amber:'#EDA100'};
@@ -651,7 +655,6 @@ function afterLoad(){
   document.getElementById('btnExport').disabled = false;
   document.getElementById('btnNovo').classList.toggle('hidden', !CFG.scriptUrl);
   buildAnos();
-  popularFiltroCategorias();
   render();
   const now = new Date();
   document.getElementById('footMeta').textContent =
@@ -692,33 +695,17 @@ function somaFluxo(tipo, mes, ano){
   return arr.filter(t => t.tipo === tipo && !isCredito(t) && t.mesRef === mes)
             .reduce((s,t) => s + t.valor, 0);
 }
-// Lançamentos "crus" do mês selecionado, respeitando a mesma convenção de data
-// usada no resto do site: Data Fatura para crédito, Data Lançamento para o
-// restante (débito, Pix, transferência). Olha a base inteira (não BY_YEAR)
-// porque uma fatura de dezembro pode cair em janeiro do ano seguinte.
-function lancamentosDoMes(mes, ano){
-  return BASE.filter(t => isCredito(t)
-    ? (t.mesFat === mes && t.anoFat === ano)
-    : (t.mesRef === mes && t.ano === ano));
-}
-function todasCategoriasPrincipais(){
-  const set = new Set();
-  BASE.forEach(t => { if (t.catP) set.add(t.catP); });
-  return [...set].sort((a,b) => a.localeCompare(b,'pt-BR'));
-}
-function popularFiltroCategorias(){
-  const sel = document.getElementById('fCatFiltro');
-  const atual = sel.value;
-  sel.innerHTML = '<option value="">Todas as categorias</option>' +
-    todasCategoriasPrincipais().map(c => `<option value="${c}">${c}</option>`).join('');
-  sel.value = [...sel.options].some(o => o.value === atual) ? atual : '';
-}
 // Visão pessoal: soma por Natureza, ignorando meio de pagamento. Uma compra no
 // crédito conta como Despesa; pagar a fatura é Neutro e não entra. Neutro e
 // Compartilhado ficam de fora (não são resultado pessoal efetivo).
-function somaNatureza(natureza, mes, ano){
+// soPagadorEU: quando true, exige Pagador="EU" (igual à fórmula da planilha
+// para Despesa). NUNCA usar em Receita — nas linhas de Receita o campo
+// Pagador guarda a origem do dinheiro, não quem pagou, e aplicar esse filtro
+// zeraria receitas de verdade.
+function somaNatureza(natureza, mes, ano, soPagadorEU){
   const arr = BY_YEAR.get(ano) || [];
-  return arr.filter(t => t.natureza === norm(natureza) && t.mesRef === mes)
+  return arr.filter(t => t.natureza === norm(natureza) && t.mesRef === mes &&
+                          (!soPagadorEU || norm(t.pagador) === norm('EU')))
             .reduce((s,t) => s + t.valor, 0);
 }
 function saldoConta(conta){
@@ -782,7 +769,7 @@ function render(){
 
   // Visão pessoal (por Natureza)
   const receita = somaNatureza('receita', mes, ano);
-  const despesa = somaNatureza('despesa', mes, ano);
+  const despesa = somaNatureza('despesa', mes, ano, true);
   const invest  = somaNatureza('investimento', mes, ano);
   document.getElementById('kReceita').textContent      = fmtR(receita);
   document.getElementById('kDespesa').textContent      = fmtR(despesa);
@@ -796,6 +783,13 @@ function render(){
     return `<div class="card ${c.cls}"><div class="lbl">${c.nome}</div><div class="val">${fmtR(v)}</div></div>`;
   }).join('');
   document.getElementById('kContasTotal').textContent = fmtR(total);
+
+  // investimentos (mesma fórmula de saldoConta: SOMASES por Conta, exclui Crédito)
+  const totalInvest = INVESTIMENTOS.reduce((s, i) => s + saldoConta(i.nome), 0);
+  document.getElementById('boxInvest').innerHTML = INVESTIMENTOS.map(i => {
+    const v = saldoConta(i.nome);
+    return `<div class="invest-pill ${i.cls}"><span class="lbl">${i.nome}</span><span class="val">${fmtR(v)}</span></div>`;
+  }).join('') + `<div class="invest-pill invest-total"><span class="lbl">Totais</span><span class="val">${fmtR(totalInvest)}</span></div>`;
 
   // cartões
   const totalDividaCartoes = CARTOES.reduce((s, c) => s + gastoCartao(c, mes, ano), 0);
@@ -832,26 +826,6 @@ function render(){
       <td class="${l.d < 0 ? 'neg' : ''}">${fmtR(l.d)}</td>
       <td style="text-align:center"><span class="pill ${l.cls}">${l.txt}</span></td>
     </tr>`).join('');
-
-  // lançamentos do mês (tabela crua, com filtro de categoria principal)
-  const catFiltro = document.getElementById('fCatFiltro').value;
-  let lanc = lancamentosDoMes(mes, ano);
-  if (catFiltro) lanc = lanc.filter(t => norm(t.catP) === norm(catFiltro));
-  lanc = lanc.slice().sort((a,b) => {
-    const da = isCredito(a) ? a.dataFat : a.dataLanc, db = isCredito(b) ? b.dataFat : b.dataLanc;
-    return (da && db) ? da - db : 0;
-  });
-  document.getElementById('tbFluxoDetalhe').innerHTML = lanc.length ? lanc.map(t => {
-    const d = isCredito(t) ? t.dataFat : t.dataLanc;
-    return `<tr>
-      <td>${d ? d.toLocaleDateString('pt-BR') : '—'}</td>
-      <td style="text-align:left">${t.catS || '—'}</td>
-      <td style="text-align:left">${t.meio || '—'}</td>
-      <td style="text-align:left">${t.conta || '—'}</td>
-      <td style="text-align:left">${t.pagador || '—'}</td>
-      <td class="${t.valor < 0 ? 'neg' : ''}">${fmtR(t.valor)}</td>
-    </tr>`;
-  }).join('') : '<tr><td colspan="6" style="text-align:center;color:var(--ink-2)">Nenhum lançamento neste período.</td></tr>';
 
   drawCat(linhas);
   drawFluxo(ano);
@@ -921,9 +895,9 @@ function exportXLSX(){
     [],
     ['Visão pessoal (por natureza, ignora meio de pagamento)',''],
     ['Receita', somaNatureza('receita', mes, ano)],
-    ['Despesa', somaNatureza('despesa', mes, ano)],
+    ['Despesa', somaNatureza('despesa', mes, ano, true)],
     ['Investimento', somaNatureza('investimento', mes, ano)],
-    ['Saldo pessoal', somaNatureza('receita', mes, ano) + somaNatureza('despesa', mes, ano)],
+    ['Saldo pessoal', somaNatureza('receita', mes, ano) + somaNatureza('despesa', mes, ano, true)],
     [],
     ['Conta','Saldo'],
     ...CONTAS.map(c => [c.nome, saldoConta(c.nome)]),
@@ -1138,7 +1112,6 @@ async function salvarLancamento(){
 
   document.getElementById('selMes').addEventListener('change', render);
   document.getElementById('selAno').addEventListener('change', render);
-  document.getElementById('fCatFiltro').addEventListener('change', render);
   document.getElementById('btnReload').addEventListener('click', () => CFG.id ? loadAll() : demo());
   document.getElementById('btnExport').addEventListener('click', exportXLSX);
   document.getElementById('btnDemo').addEventListener('click', demo);
