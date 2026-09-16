@@ -126,19 +126,24 @@ var o=[];var l=Array.isArray(e);for(f=n.s.c;f<=n.e.c;++f)s[f]=ya(f);for(var c=n.
 
   .cards-cc{grid-template-columns:repeat(auto-fit,minmax(230px,1fr))}
   .cc{background:var(--navy);border-radius:var(--radius);padding:16px 18px;color:#fff}
-  .cc h3{margin:0 0 12px;font-size:14px;font-weight:600;letter-spacing:.05em;text-transform:uppercase;text-align:center}
-  .cc .row{display:flex;justify-content:space-between;align-items:baseline;padding:5px 0;font-size:13px}
+  .cc h3{margin:0 0 6px;font-size:12px;font-weight:600;letter-spacing:.05em;text-transform:uppercase;text-align:center}
+  .cc .row{display:flex;justify-content:space-between;align-items:baseline;padding:4px 0;font-size:13px}
   .cc .row span:first-child{color:#bfcbe6}
   .cc .row span:last-child{font-weight:600}
   .cc .row.hl{background:rgba(255,209,122,.12);border-radius:6px;margin:2px -8px;padding:6px 8px}
   .cc .row.hl span:first-child{color:#ffd17a}
   .cc .row.hl span:last-child{color:#ffd17a}
+  .cc .status-row{display:flex;justify-content:space-between;align-items:center;padding:4px 0;font-size:12px}
+  .cc .status-row span:first-child{color:#bfcbe6}
+  .cc .badge{display:inline-block;padding:2px 9px;border-radius:20px;font-weight:700;font-size:11px}
+  .cc .badge.pago{background:#C6E0B4;color:#1d5a2c}
+  .cc .badge.pendente{background:#FFE699;color:#6b4e00}
   .cc-total{background:var(--navy);border-radius:var(--radius);padding:18px;color:#fff;text-align:center;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px}
   .cc-total h3{margin:0;font-size:14px;font-weight:600;letter-spacing:.05em;text-transform:uppercase}
   .cc-pill{display:inline-flex;align-items:center;gap:12px;border:1px solid rgba(255,255,255,.4);border-radius:999px;padding:8px 20px}
   .cc-pill .lbl{font-size:12px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:#fff;opacity:.92}
   .cc-pill .val{font-size:16px;font-weight:700;color:#fff}
-  .bar{height:6px;background:rgba(255,255,255,.22);border-radius:4px;overflow:hidden;margin-top:10px}
+  .bar{height:6px;background:rgba(255,255,255,.22);border-radius:4px;overflow:hidden;margin-top:8px}
   .bar > i{display:block;height:100%;background:var(--blue)}
   .bar > i.hot{background:var(--red)}
 
@@ -637,6 +642,7 @@ function normalizeBase(objs){
       conta:    String(pick(o,'Conta') ?? '').trim(),
       natureza: norm(pick(o,'Natureza')),
       pagador:  String(pick(o,'Pagador') ?? '').trim(),
+      observacao: String(pick(o,'Observação') ?? '').trim(),
     };
   }).filter(t => t.catP || t.valor);
 }
@@ -740,6 +746,24 @@ function gastoCartao(cartao, mes, ano){
   return -arr.filter(t => isCredito(t) && t.mesFat === mes && t.anoFat === ano)
              .reduce((s,t) => s + t.valor, 0);
 }
+// Procura, no Fluxo de caixa do mês/ano selecionados, a linha que representa
+// o PAGAMENTO da fatura deste cartão: Categoria Principal "Contas a pagar",
+// Categoria Secundária "Pagamento fatura cartão", Saída, Débito, e a
+// Observação citando "Fatura <cartão>". Quando essa linha é lançada, no
+// mesmo mês do pagamento (Mês ref = Data Lançamento), o status vira "Pago".
+function statusFaturaPaga(cartao, mes, ano){
+  const arr = BY_YEAR.get(ano) || [];
+  const alvo = norm('Fatura ' + cartao);
+  const linha = arr.find(t =>
+    norm(t.catP) === norm('Contas a pagar') &&
+    norm(t.catS) === norm('Pagamento fatura cartão') &&
+    t.tipo === 'saida' &&
+    t.meio === 'debito' &&
+    t.mesRef === mes &&
+    norm(t.observacao).includes(alvo)
+  );
+  return { pago: !!linha, data: linha ? linha.dataLanc : null };
+}
 function planejado(cat, mes, ano){
   return ORC.filter(r => norm(r.categoria) === norm(cat) && norm(r.mes) === norm(mes) &&
                          (!r.ano || r.ano === ano))
@@ -825,12 +849,15 @@ function render(){
     const gasto = gastoCartao(c, mes, ano);
     const disp = lim - gasto;
     const pct = lim ? Math.min(100, Math.round(gasto/lim*100)) : 0;
+    const st = statusFaturaPaga(c, mes, ano);
     return `<div class="cc">
       <h3>${c}</h3>
       <div class="row"><span>Limite inicial</span><span>${fmtR(lim)}</span></div>
       <div class="row hl"><span>Gasto do mês</span><span>${fmtR(gasto)}</span></div>
       <div class="row"><span>Disponível</span><span>${fmtR(disp)}</span></div>
       <div class="bar"><i class="${pct>=90?'hot':''}" style="width:${pct}%"></i></div>
+      <div class="status-row"><span>Status</span><span class="badge ${st.pago?'pago':'pendente'}">${st.pago?'Pago':'Pendente'}</span></div>
+      <div class="status-row"><span>Data pagamento</span><span>${st.data ? st.data.toLocaleDateString('pt-BR') : '-'}</span></div>
     </div>`;
   }).join('');
 
