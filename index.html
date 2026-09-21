@@ -748,7 +748,7 @@ function gastoCartao(cartao, mes, ano){
 }
 // Procura, no Fluxo de caixa do mês/ano selecionados, a linha que representa
 // o PAGAMENTO da fatura deste cartão: Categoria Principal "Contas a pagar",
-// Categoria Secundária "Pagamento fatura cartão", Saída, Débito, e a
+// Categoria Secundária "Pagamento de fatura cartão", Saída, Débito, e a
 // Observação citando "Fatura <cartão>". Quando essa linha é lançada, no
 // mesmo mês do pagamento (Mês ref = Data Lançamento), o status vira "Pago".
 function statusFaturaPaga(cartao, mes, ano){
@@ -756,7 +756,7 @@ function statusFaturaPaga(cartao, mes, ano){
   const alvo = norm('Fatura ' + cartao);
   const linha = arr.find(t =>
     norm(t.catP) === norm('Contas a pagar') &&
-    norm(t.catS) === norm('Pagamento fatura cartão') &&
+    norm(t.catS) === norm('Pagamento de fatura cartão') &&
     t.tipo === 'saida' &&
     t.meio === 'debito' &&
     t.mesRef === mes &&
